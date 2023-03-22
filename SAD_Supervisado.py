@@ -38,13 +38,13 @@ def KNN():
     #f=str(sys.argv[4])
     oFile = "output.out"
     hayTrain=False
-
-
+    balanced=False
+    nproc=False
 
 
     print('ARGV   :',sys.argv[1:])
     try:
-        options,remainder = getopt.getopt(sys.argv[1:],'o:k:d:p:f:h:opt:alg:t:test',['output=','k=','d=','path=','iFile','h','opt=','alg=','t=','test='])
+        options,remainder = getopt.getopt(sys.argv[1:],'o:k:d:p:f:h:opt:alg:t:test:b:np',['output=','k=','d=','path=','iFile','h','opt=','alg=','t=','test=','b=','np='])
     except getopt.GetoptError as err:
         print('ERROR:',err)
         sys.exit(1)
@@ -55,12 +55,17 @@ def KNN():
         print(opt,arg)
         if opt in ('-o','--output'):
             oFile = arg
+
         elif opt == '-k':
             K = arg
+        elif opt in ('--np'):
+            nproc = True
         elif opt in ('--alg'):
             alg = arg
         elif opt ==  '-d':
             P = arg
+        elif opt ==  '-b':
+            balanced=True
         elif opt ==  '-t':
             target = arg
         elif opt in ('-p', '--path'):
@@ -75,15 +80,21 @@ def KNN():
         elif opt in ('--opt'):
             ListOPT=True
             options = arg
-        elif opt in ('--opt'):
+        elif opt in ('--test'):
             hayTrain=True
             trainFile=arg;
 
+    K=K.split(",")
+    P=P.split(",")
 
     if path == './':
         iFile=path+str(f)
     else:
         iFile = path+"/" + str(f)
+    if (path == './' and hayTrain):
+        itrain=path+str(trainFile)
+    elif(hayTrain):
+        itrain = path+"/" + str(trainFile)
     # astype('unicode') does not work as expected
     if (ListOPT):
         listaCnfig =options.split(",")
@@ -98,6 +109,10 @@ def KNN():
                 return unicode(x)
         else:
             return str(x)
+    if(not nproc):
+        print('se va a preprocesar')
+    else:
+        print('no se va a preprocesar')
 
     #Abrir el fichero .csv y cargarlo en un dataframe de pandas
     ml_dataset = pd.read_csv(iFile)
@@ -136,26 +151,26 @@ def KNN():
 
     indice = 0
     i1 = 0
-    for a in ListaAEliminar:
-        i2 = 0
-        for b in listaDatos:
-            if (a == b):
-                listaDatos = np.delete(listaDatos, i2, 0)
-                print("SE VA A ELIMINAR LA POS " + str(i2))
-            # print(a)
-            i2 = i2 + 1
-        i1 = i1 + 1
+    if(nproc):
+        for a in ListaAEliminar:
+            i2 = 0
+            for b in listaDatos:
+                if (a == b):
+                    listaDatos = np.delete(listaDatos, i2, 0)
+                    print("SE VA A ELIMINAR LA POS " + str(i2))
+                # print(a)
+                i2 = i2 + 1
+            i1 = i1 + 1
     #print(listaDatos)
     ml_dataset = pd.read_csv(f,usecols=listaDatos)
-    print("prueba de columnas")
+
     #print(ml_dataset_n)
     #print(ml_dataset)
     # Se se para la información en numericos y no numericos(categoricos y texto). Por ejemplo si es el tipo de un dato entraria dentro de categorical
     #si en cambio, es un valor como altura o, en general, valores numericos entraría en numerical data.
     #SI NO ES NUMERICO LO TRATARÁ COMO CATEGORICO Y TRANSFORMARÁ A NUMERICO
     cant_cat=0.0
-    target_map={0.0:0,1.0:1}
-
+    target_map={}
     for feature in ml_dataset:
         temporal=pd.to_numeric(ml_dataset[feature],errors='coerce')
         if(temporal.isnull().values.any()):
@@ -169,6 +184,8 @@ def KNN():
                 cant_cat = cant_cat + 1
         else:
             ml_dataset[feature]=temporal
+    #si no se ha creado target map de categoricos se crea uno que haga categoricos de los floats ya convertidos
+
     #print(target_map)
     numerical_features = ml_dataset.columns
     #print(numerical_features)
@@ -176,32 +193,41 @@ def KNN():
     #print(ml_dataset)
     categorical_features=[]
     #Estandarizamos los datos, los no numericos se les fuerza al unicode, los numericos float o fecha estandar.
-    for feature in categorical_features:
-        ml_dataset[feature] = ml_dataset[feature].apply(coerce_to_unicode)
+    if(not nproc):
+        for feature in categorical_features:
+            ml_dataset[feature] = ml_dataset[feature].apply(coerce_to_unicode)
 
-    for feature in text_features:
-        ml_dataset[feature] = ml_dataset[feature].apply(coerce_to_unicode)
+        for feature in text_features:
+            ml_dataset[feature] = ml_dataset[feature].apply(coerce_to_unicode)
 
-    for feature in numerical_features:
+        for feature in numerical_features:
 
-        if ml_dataset[feature].dtype == np.dtype('M8[ns]') or (
-                hasattr(ml_dataset[feature].dtype, 'base') and ml_dataset[feature].dtype.base == np.dtype('M8[ns]')):
-            ml_dataset[feature] = datetime_to_epoch(ml_dataset[feature])
-        else:
-            ml_dataset[feature] = ml_dataset[feature].astype('double')
+            if ml_dataset[feature].dtype == np.dtype('M8[ns]') or (
+                    hasattr(ml_dataset[feature].dtype, 'base') and ml_dataset[feature].dtype.base == np.dtype('M8[ns]')):
+                ml_dataset[feature] = datetime_to_epoch(ml_dataset[feature])
+            else:
+                ml_dataset[feature] = ml_dataset[feature].astype('double')
     #Especifica la columna target, el target map es el diccionario además del tipo de dato en map.
     #target_map = {0: 0.0, 1: 1.0,3:2.0}
     ml_dataset['__target__'] = ml_dataset[target]#.map(str).map(target_map)
     #print(ml_dataset['__target__'])
+    datos_dif = ml_dataset[target].unique()
+    if (len(target_map) == 0):
+        print(datos_dif)
+        for x in datos_dif:
+            target_map[x] = x
     del ml_dataset[target]
     # Remove rows for which the target is unknown.
-    ml_dataset = ml_dataset[~ml_dataset['__target__'].isnull()]
+    if(nproc):
+        ml_dataset = ml_dataset[~ml_dataset['__target__'].isnull()]
 
     #Parte los datos en dos, por un lado el test size (20%) y train (80%) si hay un train especificado en la ejecucion
     train, test = train_test_split(ml_dataset,test_size=0.2,random_state=42,stratify=ml_dataset[['__target__']])
     if(hayTrain):
-        test2=pandas.read_csv(trainFile)
-    else:#si no hay train se creará uno del trian, de este modo tendremos 60,20,20 y se testeará al final dando un % de aciertos
+        print(trainFile)
+        test2=pd.read_csv(trainFile)
+    else:#si no hay train se creará uno del train, de este modo tendremos 60,20,20 y se testeará al final dando un % de aciertos
+        print("se crea un archivo de test")
         train, test2= train_test_split(train,test_size=0.25,random_state=42,stratify=train[['__target__']])
         test2.to_csv('test.csv')
     print(train.head(5))
@@ -214,115 +240,125 @@ def KNN():
     config = open("config.csv", "r")
     reader = csv.reader(config)
     #Aqui se carga la configuracion, modificable en el csv de configuración
-    for feature in reader:
-        if(primero or feature[0]==target or int(feature[1])==0):
-            primero=False
-        elif(int(feature[2])==1):
-            impute="MEAN"
-            entrada = {'feature': feature[0], 'impute_with': impute}
-            impute_when_missing.append(entrada)
-        elif(int(feature[2])==2):
-            impute="MEDIAN"
-            entrada = {'feature': feature[0], 'impute_with': impute}
-            impute_when_missing.append(entrada)
-        elif(int(feature[2])==3):
-            impute="MODE"
-            entrada = {'feature': feature[0], 'impute_with': impute}
-            impute_when_missing.append(entrada)
-        elif(int(feature[2])==4):
-            impute='CREATE_CATEGORY'
-            entrada = {'feature': feature[0], 'impute_with': impute}
-            impute_when_missing.append(entrada)
-        elif(int(feature[2])==0):
-            impute="CONSTANT"
-            entrada = {'feature': feature[0], 'impute_with': impute}
-            impute_when_missing.append(entrada)
-        else:
-            print("Ha habido un error en la configuracion del archivo 'config.csv' se recomiendo borrarlo y relanzar el programa")
-            exit()
+    if(not nproc):
+        for feature in reader:
+            if(primero or feature[0]==target or int(feature[1])==0):
+                primero=False
+            elif(int(feature[2])==1):
+                impute="MEAN"
+                entrada = {'feature': feature[0], 'impute_with': impute}
+                impute_when_missing.append(entrada)
+            elif(int(feature[2])==2):
+                impute="MEDIAN"
+                entrada = {'feature': feature[0], 'impute_with': impute}
+                impute_when_missing.append(entrada)
+            elif(int(feature[2])==3):
+                impute="MODE"
+                entrada = {'feature': feature[0], 'impute_with': impute}
+                impute_when_missing.append(entrada)
+            elif(int(feature[2])==4):
+                impute='CREATE_CATEGORY'
+                entrada = {'feature': feature[0], 'impute_with': impute}
+                impute_when_missing.append(entrada)
+            elif(int(feature[2])==0):
+                impute="CONSTANT"
+                entrada = {'feature': feature[0], 'impute_with': impute}
+                impute_when_missing.append(entrada)
+            else:
+                print("Ha habido un error en la configuracion del archivo 'config.csv' se recomiendo borrarlo y relanzar el programa")
+                exit()
 
     #print(impute_when_missing)
     config.close()
     # Elimina las features que haya faltantas
-    for feature in drop_rows_when_missing:
-        train = train[train[feature].notnull()]
-        test = test[test[feature].notnull()]
-        test2=test2[test2[feature].notnull()]
-        print('Dropped missing records in %s' % feature)
+    if(not nproc):
+        for feature in drop_rows_when_missing:
+            train = train[train[feature].notnull()]
+            test = test[test[feature].notnull()]
+            test2=test2[test2[feature].notnull()]
+            print('Dropped missing records in %s' % feature)
 
-    # Comprueba que opcion le hemos dado a cada feature, en este caso todos haran MEAN, la media.
-    for feature in impute_when_missing:
-        if feature['impute_with'] == 'MEAN':
-            v = train[feature['feature']].mean()
-        elif feature['impute_with'] == 'MEDIAN':
-            v = train[feature['feature']].median()
-        elif feature['impute_with'] == 'CREATE_CATEGORY':
-            v = 'NULL_CATEGORY'
-        elif feature['impute_with'] == 'MODE':
-            v = train[feature['feature']].value_counts().index[0]
-        elif feature['impute_with'] == 'CONSTANT':
-            v = feature['value']
-        train[feature['feature']] = train[feature['feature']].fillna(v)
-        test[feature['feature']] = test[feature['feature']].fillna(v)
-        test2[feature['feature']] = test2[feature['feature']].fillna(v)
-        print('Imputed missing values in feature %s with value %s' % (feature['feature'], coerce_to_unicode(v)))
+
+    if(not nproc):
+     # Comprueba que opcion le hemos dado a cada feature, en este caso todos haran MEAN, la media.
+        for feature in impute_when_missing:
+            if feature['impute_with'] == 'MEAN':
+                v = train[feature['feature']].mean()
+            elif feature['impute_with'] == 'MEDIAN':
+                v = train[feature['feature']].median()
+            elif feature['impute_with'] == 'CREATE_CATEGORY':
+                v = 'NULL_CATEGORY'
+            elif feature['impute_with'] == 'MODE':
+                v = train[feature['feature']].value_counts().index[0]
+            elif feature['impute_with'] == 'CONSTANT':
+                v = feature['value']
+            train[feature['feature']] = train[feature['feature']].fillna(v)
+            test[feature['feature']] = test[feature['feature']].fillna(v)
+            test2[feature['feature']] = test2[feature['feature']].fillna(v)
+            print('Imputed missing values in feature %s with value %s' % (feature['feature'], coerce_to_unicode(v)))
     rescale_features={}
     config = open("config.csv", "r")
     reader = csv.reader(config)
     primero=True
     #Carga la configuración del archivo
-    for feature in reader:
-        if(primero or feature[0]==target or int(feature[1])==0):
-            primero=False
-        elif(int(feature[3])==1):
-            rescale="AVGSTD"
-            rescale_features[str(feature[0])]=(rescale)
-        elif(int(feature[3])==2):
-            rescale="MINMAX"
-            rescale_features[str(feature[0])]=(rescale)
+    if(not nproc):
+        for feature in reader:
+            if(primero or feature[0]==target or int(feature[1])==0):
+                primero=False
+            elif(int(feature[3])==1):
+                rescale="AVGSTD"
+                rescale_features[str(feature[0])]=(rescale)
+            elif(int(feature[3])==2):
+                rescale="MINMAX"
+                rescale_features[str(feature[0])]=(rescale)
 
-        else:
-            print("Ha habido un error en la configuracion del archivo 'config.csv' se recomiendo borrarlo y relanzar el programa")
-            exit()
+            else:
+                print("Ha habido un error en la configuracion del archivo 'config.csv' se recomiendo borrarlo y relanzar el programa")
+                exit()
 
     print(rescale_features)
     config.close()
     #Se especifica el reescalado,en este caso avg std
-
-    for (feature_name, rescale_method) in rescale_features.items():
-        if rescale_method == 'MINMAX':
-            _min = train[feature_name].min()
-            _max = train[feature_name].max()
-            scale = _max - _min
-            shift = _min
-        else:
-            #print("entra")
-            shift = train[feature_name].mean()
-            scale = train[feature_name].std()
-        if scale == 0.:
-            del train[feature_name]
-            del test[feature_name]
-            del test2[feature_name]
-            #print('Feature %s was dropped because it has no variance' % feature_name)
-        else:
-            #print('Rescaled %s' % feature_name)
-            train[feature_name] = (train[feature_name] - shift).astype(np.float64) / scale
-            test[feature_name] = (test[feature_name] - shift).astype(np.float64) / scale
-            test2[feature_name] = (test2[feature_name] - shift).astype(np.float64) / scale
+    if(not nproc):
+        for (feature_name, rescale_method) in rescale_features.items():
+            if rescale_method == 'MINMAX':
+                _min = train[feature_name].min()
+                _max = train[feature_name].max()
+                scale = _max - _min
+                shift = _min
+            else:
+                #print("entra")
+                shift = train[feature_name].mean()
+                scale = train[feature_name].std()
+            if scale == 0.:
+                del train[feature_name]
+                del test[feature_name]
+                del test2[feature_name]
+                #print('Feature %s was dropped because it has no variance' % feature_name)
+            else:
+                #print('Rescaled %s' % feature_name)
+                train[feature_name] = (train[feature_name] - shift).astype(np.float64) / scale
+                test[feature_name] = (test[feature_name] - shift).astype(np.float64) / scale
+                test2[feature_name] = (test2[feature_name] - shift).astype(np.float64) / scale
     #Se separan las features y los labels.
     trainX = train.drop('__target__', axis=1)#label
-    #trainY = train['__target__']
+    trainY = train['__target__']
     testX = test.drop('__target__', axis=1)#label
-    #testY = test['__target__']
+    testY = test['__target__']
 
     trainY = np.array(train['__target__'])#datos
     testY = np.array(test['__target__'])#datos
 
+    if(balanced and not nproc):
     # Explica lo que se hace en este paso
-    #undersample = RandomUnderSampler(sampling_strategy=0.1)#la mayoria va a estar representada el doble de veces
+        if(len(target_map)==2):
+            undersample = RandomUnderSampler(sampling_strategy=0.5)# 50/50 cada clase, solo en binarios
+        else:
+            print("undersample auto")
+            undersample = RandomUnderSampler(sampling_strategy='not minority')
 
-    #trainXUnder,trainYUnder = undersample.fit_resample(trainX,trainY)
-    #testXUnder,testYUnder = undersample.fit_resample(testX, testY)
+        trainXUnder,trainYUnder = undersample.fit_resample(trainX,trainY)
+        testXUnder,testYUnder = undersample.fit_resample(testX, testY)
 
     resultados = open("resultados.csv", "w")
     writer = csv.writer(resultados)
@@ -332,14 +368,12 @@ def KNN():
     f1_scoreM_max=0.0
     combW=""
     combM=""
+    #print(trainX)
     while comb<=2:
-        if( alg=="KNN"):
-            k=1
-        else:
-            k=3
-        while k<=int(K):
-            p = 1
-            while p<=int(P):
+        for k in K:
+            k=int(k)
+            for p in P:
+                p=int(p)
                 if comb <= 1:
                     mss = float(comb)
                     #print("el mss es")
@@ -384,7 +418,9 @@ def KNN():
                                                  max_depth=k,
                                                  min_samples_leaf=p,
                                                  min_samples_split=mss)
-                clf.class_weight = "balanced"
+
+                if(balanced):
+                    clf.class_weight = "balanced"
 
                 # Entrenar el modelo
 
@@ -444,7 +480,7 @@ def KNN():
                         combinacion = ("ALG="+alg+ "Max Depth=" + str(k) + ",Min _Samples_lead=" + str(p) + ",class=" + str(
                             x) + " min_samples_split="+str(comb))
                         combinacionArch=("ALG="+alg+ ",Max Depth=" + str(k) + ",Min _Samples_lead=" + str(p) + ",min_samples_split="+str(comb))
-                    elif(alg=="RTREE"):
+                    elif(alg=="RFOREST"):
                         combinacion = ("ALG="+alg+ "K=" + str(k) + ",p=" + str(p) + ",class=" + str(
                             x) +" min_samples_split="+str(comb))
                         combinacionArch=("ALG="+alg+ ",K=" + str(k) + ",p=" + str(p)  +",min_samples_split="+str(comb))
@@ -493,27 +529,29 @@ def KNN():
     print(str(f1_scoreW_max.__round__(3))+" Con la combinación:"+combW)
     print("El mejor f1_score macro ha sido:")
     print(str(f1_scoreM_max.__round__(3)) + " Con la combinación:" + combM)
+
+    print("Probandolo con el test.csv creado automaticamente obtenemos:" )
+    print("Weighted avg:")
+    #print(combW+".sav")
+    #print(train.columns)
+    clf=pickle.load(open(combW+".sav",'rb'))
+    print(test2)
     try:
-        print("Probandolo con el test.csv creado automaticamente obtenemos:" )
-        print("Weighted avg:")
-        #print(combW+".sav")
-        #print(train.columns)
-        #print(test2.columns)
-        clf=pickle.load(open(combW+".sav",'rb'))
         results=test2['__target__']
-        del test2['__target__']
-        comprobar(results,clf.predict(test2))
-        print('Macro avg:')
-        clf = pickle.load(open(combM + ".sav", 'rb'))
-        comprobar(results,clf.predict(test2))
     except:
-        print("Ha ocurrido un error durante la comprobación con el test")
+        test2=test2.rename(columns={target: '__target__'})
+        results=test2['__target__']
+    del test2['__target__']
+
+    comprobar(results,clf.predict(test2))
+    print('Macro avg:')
+    clf = pickle.load(open(combM + ".sav", 'rb'))
+    comprobar(results,clf.predict(test2))
+    print(not nproc)
     exit()
 def comprobar(results,resultado):
     i = 0
     cont = 0
-    #print(resultado)
-    #print(results)
     for x in results:
         #print(x)
         #print(resultado[i])
