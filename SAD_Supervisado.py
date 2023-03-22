@@ -74,8 +74,9 @@ def KNN():
             f = arg
             print(f)
         elif opt in ('-h','--help'):
-            print(' -o outputFile \n -k numberOfItems \n -d distanceParameter \n -p inputFilePath \n -f inputFileName \n -t targetColumn\n -alg KNN or RTree\n-opt x,y,z\n')
+            print(' -o outputFile \n -k range of k(x,y..) \n -d range of d(x,y...) \n -p inputFilePath \n -f inputFileName \n -t targetColumn\n -alg KNN or DTREE \n-opt x,y,z\n --test test file name\n -b balance the features\n -np no process \n')
             print("Options are used for a default value for every column, after executing check config.csv out")
+            peinr("Ejemplo:python3 SAD_Supervisado.py -k 1,3,5 -d 1,2 --opt 1,1,1 --alg KNN -f pruebaexamen.csv -p ./ -t Class -np 1 --test test2.csv ")
             exit(1)
         elif opt in ('--opt'):
             ListOPT=True
