@@ -125,6 +125,7 @@ def KNN():
     df=pd.read_csv(iFile)
     listaDatos=df.columns.values
     localPath= Path(iFile)
+    #CREA EL ARCHIVO DE OPCIONES
     if(ListOPT):
         config = open("config.csv", "w")
         writer = csv.writer(config)
@@ -140,6 +141,7 @@ def KNN():
     reader=csv.reader(config)
     ListaAEliminar=[]
     primero=True
+    #AQUI LEE LAS OPCIONES, SI EL PRIMER DIGITO ES 0 DE LA FEATURE LO AÑADE A LA LISTA PARA ELIMINAR
     for feature in reader:
         if(primero):
             primero=False
@@ -171,6 +173,7 @@ def KNN():
     #SI NO ES NUMERICO LO TRATARÁ COMO CATEGORICO Y TRANSFORMARÁ A NUMERICO
     cant_cat=0.0
     target_map={}
+    #AQUI SE COMPRUEBA SI HAY TEXTO, SI HAY LO TOMARÁ COMO CATEGÓRICO Y CREARÁ
     for feature in ml_dataset:
         temporal=pd.to_numeric(ml_dataset[feature],errors='coerce')
         if(temporal.isnull().values.any()):
@@ -240,7 +243,7 @@ def KNN():
     config = open("config.csv", "r")
     reader = csv.reader(config)
     #Aqui se carga la configuracion, modificable en el csv de configuración
-    if(not nproc):
+    if(not nproc):#nproc es no procesar
         for feature in reader:
             if(primero or feature[0]==target or int(feature[1])==0):
                 primero=False
@@ -280,7 +283,7 @@ def KNN():
 
 
     if(not nproc):
-     # Comprueba que opcion le hemos dado a cada feature, en este caso todos haran MEAN, la media.
+     # Comprueba que opcion le hemos dado a cada feature, en el caso de opt=1 todos haran MEAN, la media.
         for feature in impute_when_missing:
             if feature['impute_with'] == 'MEAN':
                 v = train[feature['feature']].mean()
@@ -535,7 +538,7 @@ def KNN():
     #print(combW+".sav")
     #print(train.columns)
     clf=pickle.load(open(combW+".sav",'rb'))
-    print(test2)
+    #print(test2)
     try:
         results=test2['__target__']
     except:
